@@ -1,5 +1,0 @@
-loguru
-pandas
-numpy
-streamlit
-scikit-learn
