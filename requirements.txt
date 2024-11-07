@@ -1,5 +1,5 @@
+loguru
 pandas
 numpy
 streamlit
 scikit-learn
-loguru
