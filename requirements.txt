@@ -4,4 +4,4 @@ numpy
 sklearn
 plotly
 imbalanced-learn
-autoclean @ git+https://github.com/Albertvillanova/autoclean.git
+autoclean @ git+https://github.com/elisemercury/AutoClean.git
