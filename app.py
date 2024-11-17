@@ -39,8 +39,7 @@ with tab1:
             df.drop_duplicates(inplace=True)
             df.dropna(axis=1, inplace=True)
 
-            df_copy = df.copy()
-
+            
             cat_feature = df.select_dtypes(include=['object']).columns
             encoder = {}
             
@@ -49,6 +48,23 @@ with tab1:
                 df[cat] = le.fit_transform(df[cat])
                 encoder[cat] = le
 
+            correlation_matrix = df.corr()
+            to_drop = set()
+            selected_columns = set()
+
+            for col in correlation_matrix.columns:
+                if col not in to_drop and col != target_column:
+                    high_corr_cols = correlation_matrix.index[(correlation_matrix[col] > 0.8) & (correlation_matrix[col] < 1)]
+                    
+                    for high_corr_col in high_corr_cols:
+                        if high_corr_col not in selected_columns:
+                            to_drop.add(high_corr_col)
+                            selected_columns.add(col) 
+                            break 
+
+            df = df.drop(columns=to_drop)
+
+            df_copy = df.copy()
             x = df.drop(target_column, axis=1)
             y = df[target_column]
 
@@ -152,20 +168,12 @@ with tab2:
                 template="plotly_white",
             )
             return fig
-
-        def plot_correlation(data):
-            corr_matrix = data.corr()
-            fig = go.Figure(
-                data=go.Heatmap(
-                    z=corr_matrix.values,
-                    x=corr_matrix.columns,
-                    y=corr_matrix.columns,
-                    colorscale="Viridis",
-                    zmin=-1,
-                    zmax=1,
-                )
+        def plot_pie(data,column):
+            fig=px.pie(
+                data,
+                names=column,
+                title=f"percentages of {column}"
             )
-            fig.update_layout(title="Correlation Heatmap")
             return fig
 
         st.write("Dataset Summary:")
@@ -175,9 +183,12 @@ with tab2:
         st.write("Visualizations:")
         for column in df.columns:
             try:
-                if df[column].dtype == "object" or df[column].nunique() < 20:
+                if df[column].dtype == "object" or df[column].nunique() < 20 and column!=target_column:
                     st.write(f"Categorical Column: {column}")
                     fig = plot_categorical(df, column)
+                elif column == target_column:
+                    st.write(f"Target Column: {column}")
+                    fig=plot_pie(df,target_column)
                 else:
                     st.write(f"Numerical Column: {column}")
                     fig = plot_numerical(df, column)
@@ -186,12 +197,6 @@ with tab2:
                 st.warning(f"Could not plot column `{column}`: {str(e)}")
 
         numerical_data = df.select_dtypes(include=["float64", "int64"])
-        if not numerical_data.empty:
-            st.write("Correlation Heatmap:")
-            heatmap_fig = plot_correlation(numerical_data)
-            st.plotly_chart(heatmap_fig)
-        else:
-            st.warning("No numerical data available for correlation heatmap.")
     else:
         st.warning("No data available. Please upload and process the data in the 'Processing' tab first.")
 if 'user_inputs' not in st.session_state:
