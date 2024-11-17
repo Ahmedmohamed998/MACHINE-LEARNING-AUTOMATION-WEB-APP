@@ -301,9 +301,11 @@ with tab3:
                            st.error(f'Final Voting: Not {st.session_state.target_column}')
                         del st.session_state.y_pred
                         input_with_prediction = inputs.copy()
-                        input_with_prediction['Prediction'] = y_pred_final[0]
+                        if y_pred_final.most_common(1)[0][0] == 1:
+                            input_with_prediction['Prediction'] =1
+                        else:
+                            input_with_prediction['Prediction'] =0
                         st.session_state.user_inputs.append(input_with_prediction)
-                            
                         if st.session_state.user_inputs:
                             user_inputs_df = pd.DataFrame(st.session_state.user_inputs)
                             csv = user_inputs_df.to_csv(index=False).encode('utf-8')
