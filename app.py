@@ -109,7 +109,8 @@ with tab1:
                 file_name='test_data.csv',
                 mime='text/csv'
             )
-
+            with open('model.pkl', 'wb') as model_file:
+                pkl.dump(st.session_state.model, model_file)
             with open('model.pkl', 'rb') as model_file:
                 st.download_button(
                     label="Download Model",
