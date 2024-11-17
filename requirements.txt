@@ -1,3 +1,5 @@
 scikit-learn
 plotly
 imbalanced-learn
+pandas
+streamlit
