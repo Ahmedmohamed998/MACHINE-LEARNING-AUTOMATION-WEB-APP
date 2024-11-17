@@ -242,7 +242,7 @@ with tab3:
             csv = user_inputs_df.to_csv(index=False).encode('utf-8')
             
             st.download_button(
-                label="Download Data as CSV",
+                label="Download New Data as CSV",
                 data=csv,
                 file_name='user_inputs.csv',
                 mime='text/csv'
