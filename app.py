@@ -11,6 +11,9 @@ import pandas.api.types as pytype
 import pickle as pkl
 import plotly.express as px
 import plotly.graph_objects as go
+from xgboost import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier
+from collections import Counter
 st.set_page_config(layout='wide')
 st.title('🤖CSV Data Processing and Prediction')
 tab1,tab2,tab3=st.tabs(['⚙️Processing','📊Analysis & Visualizations','🤖Prediction'])
@@ -53,23 +56,24 @@ with tab1:
             selected_columns = set()
 
             for col in correlation_matrix.columns:
-                if col not in to_drop and col != target_column:
+                if col != target_column and col not in to_drop and not df[col].equals(df[target_column]):
                     high_corr_cols = correlation_matrix.index[(correlation_matrix[col] > 0.8) & (correlation_matrix[col] < 1)]
-                    
                     for high_corr_col in high_corr_cols:
-                        if high_corr_col not in selected_columns:
+                        if high_corr_col not in selected_columns and high_corr_col != target_column:
                             to_drop.add(high_corr_col)
-                            selected_columns.add(col) 
-                            break 
+                            selected_columns.add(col)
+                            break
 
-            df = df.drop(columns=to_drop)
+            to_drop.discard(target_column) 
+            df = df.drop(columns=list(to_drop), errors='ignore') 
 
             df_copy = df.copy()
             x = df.drop(target_column, axis=1)
             y = df[target_column]
 
             x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
-
+            y_train = y_train.astype(int)
+            x_train = x_train.astype(int)
             value_counts = y.value_counts()
             threshold = 0.4
             if (value_counts[0] / value_counts.sum() < threshold) or (value_counts[1] / value_counts.sum() < threshold):
@@ -86,16 +90,21 @@ with tab1:
             x_train_df = pd.DataFrame(x_train_sc)
             x_test_df = pd.DataFrame(x_test_sc)
 
-            model = LogisticRegression()
-            model.fit(x_train_sc, y_train)
-
+            logistic = LogisticRegression()
+            logistic.fit(x_train_sc, y_train)
+            XG=XGBClassifier()
+            XG.fit(x_train_sc,y_train)
+            Randomforest=RandomForestClassifier()
+            Randomforest.fit(x_train_sc,y_train)
             st.session_state.df = df
             st.session_state.df_copy = df_copy
             st.session_state.target_column = target_column
             st.session_state.encoder = encoder
             st.session_state.pt = pt
             st.session_state.scaler = scaler
-            st.session_state.model = model
+            st.session_state.logistic = logistic
+            st.session_state.XG = XG
+            st.session_state.Randomforest = Randomforest
 
             st.session_state.processed_csv = df.to_csv(index=False).encode('utf-8')
             st.session_state.train_csv = x_train_df.to_csv(index=False).encode('utf-8')
@@ -125,13 +134,31 @@ with tab1:
                 file_name='test_data.csv',
                 mime='text/csv'
             )
-            with open('model.pkl', 'wb') as model_file:
-                pkl.dump(st.session_state.model, model_file)
-            with open('model.pkl', 'rb') as model_file:
+            with open('logistic.pkl', 'wb') as logistic_file:
+                pkl.dump(st.session_state.logistic, logistic_file)
+            with open('logistic.pkl', 'rb') as logistic_file:
                 st.download_button(
-                    label="Download Model",
-                    data=model_file,
-                    file_name='model.pkl',
+                    label="Download logistic",
+                    data=logistic_file,
+                    file_name='logistic.pkl',
+                    mime='application/octet-stream'
+                )
+            with open('XG.pkl', 'wb') as XG_file:
+                pkl.dump(st.session_state.XG, XG_file)
+            with open('XG.pkl', 'rb') as XG_file:
+                st.download_button(
+                    label="Download XG",
+                    data=XG_file,
+                    file_name='XG.pkl',
+                    mime='application/octet-stream'
+                )
+            with open('Randomforest.pkl', 'wb') as Randomforest_file:
+                pkl.dump(st.session_state.Randomforest, Randomforest_file)
+            with open('Randomforest.pkl', 'rb') as Randomforest_file:
+                st.download_button(
+                    label="Download Randomforest",
+                    data=Randomforest_file,
+                    file_name='Randomforest.pkl',
                     mime='application/octet-stream'
                 )
 
@@ -218,38 +245,76 @@ with tab3:
                     inputs[feature] = st.number_input(feature, step=0.1, format='%.2f')
                 else:
                     inputs[feature] = st.number_input(feature, step=1)
-        
-        if st.button('Predict'):
-            with st.spinner('Making prediction...'):
-                time.sleep(0.8)
-                features = []
-                for feature in input_features:
-                    value = inputs[feature]
-                    if feature in cat_features:
-                        value = st.session_state.encoder[feature].transform([value])[0]
-                    features.append(value)
-                
-                features = np.array(features).reshape(1, -1)
-                feature_scaled = st.session_state.pt.transform(features)
-                feature_scaled = st.session_state.scaler.transform(feature_scaled)
-                y_pred = st.session_state.model.predict(feature_scaled)
+        features_list = []
+        for col in input_features:
+            value = inputs[col]
 
-                if y_pred == 1:
-                    st.success(st.session_state.target_column)
+            if col in cat_features:
+                le = st.session_state.encoder 
+                transformed_value = le.transform(np.array([[value]]))
+                features_list.append(transformed_value.item())
+            else:
+                features_list.append(value)
+
+        features_array = np.array(features_list).reshape(1, -1)
+        feature_trans = st.session_state.pt.transform(features_array)
+        features_scaled = st.session_state.scaler.transform(feature_trans)
+
+        if 'y_pred' not in st.session_state:
+            st.session_state.y_pred = []
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            if st.button('Predict Logistic'):
+                y_pred_model_log =  st.session_state.logistic.predict(features_scaled)[0]
+                st.session_state.y_pred.append(y_pred_model_log)
+                if y_pred_model_log == 1:
+                   st.success('Logistic:'+st.session_state.target_column)
                 else:
-                    st.error(f'Not {st.session_state.target_column}')
-                
-                input_with_prediction = inputs.copy()
-                input_with_prediction['Prediction'] = y_pred[0]
-                st.session_state.user_inputs.append(input_with_prediction)
-        
-        if st.session_state.user_inputs:
-            user_inputs_df = pd.DataFrame(st.session_state.user_inputs)
-            csv = user_inputs_df.to_csv(index=False).encode('utf-8')
-            
-            st.download_button(
-                label="Download New Data as CSV",
-                data=csv,
-                file_name='user_inputs.csv',
-                mime='text/csv'
-            )
+                    st.error(f'Logistic: Not {st.session_state.target_column}')
+
+        with col2:
+            if st.button('Predict Randomforest'):
+                y_pred_model_stacking = st.session_state.Randomforest.predict(features_scaled)[0]
+                st.session_state.y_pred.append(y_pred_model_stacking)
+                if y_pred_model_stacking == 1:
+                   st.success('Randomforest:'+st.session_state.target_column)
+                else:
+                    st.error(f'Randomforest: Not {st.session_state.target_column}')
+
+        with col3:
+            if st.button('Predict XGBoost'):
+                y_pred_model_XG = st.session_state.XG.predict(features_scaled)[0]
+                st.session_state.y_pred.append(y_pred_model_XG)
+                if y_pred_model_XG == 1:
+                   st.success('XGBoost: '+st.session_state.target_column)
+                else:
+                    st.error(f'XGBoost: Not {st.session_state.target_column}')
+
+        with col4:
+            if st.button('Final Voting From Models') :
+                    if len(st.session_state.y_pred) == 3:
+                        y_pred_final = Counter(st.session_state.y_pred)
+                        if y_pred_final.most_common(1)[0][0] == 1:
+                           st.success('Final Voting:'+st.session_state.target_column)
+                        else:
+                           st.error(f'Final Voting: Not {st.session_state.target_column}')
+                        del st.session_state.y_pred
+                        input_with_prediction = inputs.copy()
+                        input_with_prediction['Prediction'] = y_pred_final[0]
+                        st.session_state.user_inputs.append(input_with_prediction)
+                            
+                        if st.session_state.user_inputs:
+                            user_inputs_df = pd.DataFrame(st.session_state.user_inputs)
+                            csv = user_inputs_df.to_csv(index=False).encode('utf-8')
+                            
+                            st.download_button(
+                                label="Download New Data as CSV",
+                                data=csv,
+                                file_name='user_inputs.csv',
+                                mime='text/csv'
+                            )
+                    else:
+                        st.error('Press on each model button first')
+                        del st.session_state.y_pred
