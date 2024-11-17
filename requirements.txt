@@ -4,3 +4,5 @@ imbalanced-learn
 pandas
 streamlit
 loguru
+xgboost
+collections
