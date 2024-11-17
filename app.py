@@ -5,7 +5,6 @@ from sklearn.preprocessing import LabelEncoder, PowerTransformer, RobustScaler
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from imblearn.over_sampling import BorderlineSMOTE
-import time
 import streamlit as st
 import pandas.api.types as pytype
 import pickle as pkl
