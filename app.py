@@ -28,19 +28,16 @@ with tab1:
 
     if "uploaded_file" in st.session_state:
         df = st.session_state.df_original
-
         target_column = st.selectbox("Select the target column", df.columns)
-
         if st.button('Process File'):
             for column in df.columns:
                 if any(keyword in column.lower() for keyword in ['name', 'ticket', 'id', 'date', 'unnamed']):
                     df.drop(column, axis=1, inplace=True)
 
-            df = AutoClean(df, mode='manual', duplicates='auto', missing_num='knn', missing_categ='knn', outliers='winz')
+            df = AutoClean(df, mode='manual', duplicates='auto', missing_num='knn', missing_categ='knn', outliers='winz',target_column=target_column)
             df = df.output
             df.drop_duplicates(inplace=True)
             df.dropna(axis=1, inplace=True)
-
             
             cat_feature = df.select_dtypes(include=['object']).columns
             encoder = {}
@@ -70,7 +67,7 @@ with tab1:
             x = df.drop(target_column, axis=1)
             y = df[target_column]
 
-            x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+            x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42,stratify=y)
             y_train = y_train.astype(int)
             x_train = x_train.astype(int)
             value_counts = y.value_counts()
