@@ -1,7 +1,3 @@
-streamlit
-pandas
-numpy
 scikit-learn
 plotly
 imbalanced-learn
-autoclean @ git+https://github.com/elisemercury/AutoClean.git
